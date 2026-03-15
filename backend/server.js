@@ -33,7 +33,6 @@ app.post("/upload", upload.single("file"), async (req, res) => {
           text += decodeURIComponent(t.R[0].T) + " ";
         });
       });
-      // Delete file after reading text
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       res.json({ text });
     });
@@ -66,9 +65,19 @@ app.post("/ask-ai", async (req, res) => {
       prompt = `Create a summary of this document. Include Title, Overview, and Key Points.\n\nDocument: ${context.substring(0, 15000)}`;
     } 
     else if (type === "quiz") {
-      prompt = `Generate 5 multiple choice questions based on this document.\n\nDocument: ${context.substring(0, 15000)}`;
+      prompt = `Generate 10 multiple choice questions based on this document.
+      Use this EXACT format for each:
+      Q: [Question]
+      A) [Option]
+      B) [Option]
+      C) [Option]
+      D) [Option]
+      Correct: [Letter]
+      Reason: [One sentence explanation why]
+
+      Focus on key makeup products and market gaps.
+      Document: ${context.substring(0, 15000)}`;
     } 
-    // STEP 1: Updated Mindmap Prompt
     else if (type === "mindmap") {
       prompt = `
 Create a hierarchical mind map of this makeup document. 
@@ -90,7 +99,6 @@ ${context.substring(0, 15000)}
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-    
     const result = await model.generateContent(prompt);
     const answer = result.response.text();
 
