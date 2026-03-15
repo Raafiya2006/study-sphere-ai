@@ -1,112 +1,84 @@
 const express = require("express");
-const cors = require("cors");
 const multer = require("multer");
-const PDFParser = require("pdf2json");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-const genAI = new GoogleGenerativeAI("AIzaSyDAM3J9rCPOSZS8n_VN_rzKr0a9MT54iDk");
+const cors = require("cors");
+const pdf = require("pdf-parse"); // Ensure you ran 'npm install pdf-parse'
+const { GoogleGenerativeAI } = require("@google-cloud/generative-ai");
+require("dotenv").config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// Test route
-app.get("/", (req, res) => {
-  res.send("StudySphere AI backend is running");
-});
+const upload = multer({ dest: "uploads/" });
 
-// File storage setup
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-const upload = multer({ storage });
-
-// Upload + Extract PDF Text
+// 1. Route: Upload PDF and Extract Text
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
+    const fs = require("fs");
+    const dataBuffer = fs.readFileSync(req.file.path);
+    const data = await pdf(dataBuffer);
+    
+    res.json({ 
+      message: "File uploaded and processed successfully!", 
+      text: data.text 
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to extract text from PDF." });
+  }
+});
 
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+// 2. Route: Smart Analysis (Flashcards, Quiz, Summary, Key Points)
+app.post("/analyze-doc", async (req, res) => {
+  const { context } = req.body;
+
+  if (!context) return res.status(400).json({ error: "No document context provided." });
+
+  const prompt = `
+    Analyze the following study material and return a JSON object. 
+    Strictly follow this JSON format without any extra text or markdown code blocks:
+    {
+      "summary": "A 3-sentence high-level summary",
+      "keyPoints": ["point 1", "point 2", "point 3", "point 4", "point 5"],
+      "flashcards": [
+        {"front": "Question/Term 1", "back": "Answer/Definition 1"},
+        {"front": "Question/Term 2", "back": "Answer/Definition 2"},
+        {"front": "Question/Term 3", "back": "Answer/Definition 3"}
+      ],
+      "quiz": [
+        {"question": "Q1", "options": ["A", "B", "C", "D"], "answer": "Correct Option"},
+        {"question": "Q2", "options": ["A", "B", "C", "D"], "answer": "Correct Option"}
+      ]
     }
 
-    const filePath = "./uploads/" + req.file.filename;
+    Document Content: ${context.substring(0, 15000)} 
+  `;
 
-    const pdfParser = new PDFParser();
-
-    pdfParser.on("pdfParser_dataError", errData => {
-      console.error(errData.parserError);
-      res.json({
-        message: "File uploaded successfully",
-        text: "Could not extract text from this PDF."
-      });
-    });
-
-    pdfParser.on("pdfParser_dataReady", pdfData => {
-
-      let text = "";
-
-      pdfData.Pages.forEach(page => {
-        page.Texts.forEach(textItem => {
-          text += decodeURIComponent(textItem.R[0].T) + " ";
-        });
-      });
-
-      res.json({
-        message: "File uploaded successfully",
-        text: text
-      });
-
-    });
-
-    pdfParser.loadPDF(filePath);
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Upload failed" });
-  }
-});
-
-
-app.post("/ask-ai", async (req, res) => {
   try {
-
-    const { question, context } = req.body;
-
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-    const prompt = `
-    Use the following document to answer the question.
-
-    Document:
-    ${context}
-
-    Question:
-    ${question}
-    `;
-
     const result = await model.generateContent(prompt);
-
-    const response = result.response.text();
-
-    res.json({ answer: response });
-
+    const responseText = result.response.text();
+    // Clean potential markdown from AI response
+    const cleanJson = responseText.replace(/```json|```/gi, "").trim();
+    res.json(JSON.parse(cleanJson));
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "AI request failed" });
+    res.status(500).json({ error: "AI Analysis failed." });
   }
 });
 
-
-// Start server
-const PORT = 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// 3. Route: Regular Chat Q&A
+app.post("/ask-ai", async (req, res) => {
+  const { question, context } = req.body;
+  try {
+    const prompt = `Context: ${context}\n\nQuestion: ${question}`;
+    const result = await model.generateContent(prompt);
+    res.json({ answer: result.response.text() });
+  } catch (error) {
+    res.status(500).json({ error: "AI Chat failed." });
+  }
 });
+
+const PORT = 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
