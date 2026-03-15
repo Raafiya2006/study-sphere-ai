@@ -1,70 +1,61 @@
-# Getting Started with Create React App
+# StudySphere AI 🌐🧠
+### *The Intelligent Knowledge Retrieval & "Second Brain" System*
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**StudySphere AI** is a high-performance, AI-driven learning platform that transforms static documents into an interactive ecosystem. By utilizing advanced prompt engineering and real-time data visualization, it solves the problem of information overload, turning dense PDFs into "Second Brain" assets.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🚀 Problem Statement: AI-2
+> *"Accessing and organizing knowledge from multiple sources can be overwhelming. There is a need for intelligent systems that help users retrieve, organize, and understand information quickly and efficiently."*
 
-### `npm start`
+**Our Solution:** StudySphere AI provides an "Intelligent Retrieval" interface where users don't just read documents—they interact with them through AI Tutoring, 3D Flashcards, and Dynamic Mind Maps.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## ✨ Key Features
+* **🤖 AI Study Tutor:** A real-time chat interface that allows users to "interview" their documents for specific facts.
+* **📊 Dynamic Mind Mapping:** Automatically generates a hierarchical, visual structure of complex topics using **ReactFlow**.
+* **📝 Professional Summarization:** Converts long-form content into structured study notes with an instant **PDF Export** feature.
+* **🧠 Cognitive Quiz Engine:** Generates 10-question assessments with mistake tracking and logical reasoning feedback.
+* **🃟 3D Glass-morphism Flashcards:** Utilizes **Framer Motion** for a tactile, interactive memory retention experience.
+* **🌊 Interactive Math-driven UI:** A custom **Perlin Noise** background engine that reacts to user movements, creating a premium study environment.
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## 🛠️ Tech Stack
+* **Frontend:** React.js, Framer Motion (Animations), ReactFlow (Data Viz), jsPDF (Document Generation).
+* **Backend:** Node.js, Express.
+* **AI Engine:** Google Gemini 1.5 Flash (Generative AI & Prompt Engineering).
+* **Parsing:** PDF2JSON (Server-side document extraction).
 
-### `npm run build`
+---
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## 🏗️ System Architecture
+```mermaid
+graph TD
+    subgraph Frontend [React Application]
+        A[User Interface] --> B[File Upload Handler]
+        A --> C[AI Study Hub]
+        C --> C1[Summary/PDF Export]
+        C --> C2[Interactive Quiz]
+        C --> C3[Flashcards]
+        C --> C4[Mind Map]
+        A --> D[AI Tutor Sidebar]
+    end
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+    subgraph Backend [Node.js & Express Server]
+        E[Multer Middleware] --> F[PDF2JSON Parser]
+        F --> G[Context Manager]
+        G --> H{Gemini AI Engine}
+    end
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+    subgraph External [External Services]
+        H --> I[Google Gemini API]
+        C1 --> J[jsPDF Library]
+        C4 --> K[ReactFlow Engine]
+    end
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+    B -->|Multipart Form Data| E
+    C & D -->|JSON Prompt Engineering| H
+    I -->|Generative Response| G
+    G -->|Structured Data| A
