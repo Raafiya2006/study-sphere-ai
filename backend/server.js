@@ -63,6 +63,7 @@ No asterisks or markdown characters.
 Document: ${context.substring(0, 15000)}`;
     } else if (type === "quiz") {
       prompt = `Generate 10 multiple choice questions based on this document.
+Do NOT include any intro text or preamble. Start directly with Q: 
 Use this EXACT format for each:
 Q: [Question]
 A) [Option]
