@@ -9,6 +9,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.get("/", (req, res) => {
+  res.send("StudySphere AI backend is running");
+});
 
 if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
 
