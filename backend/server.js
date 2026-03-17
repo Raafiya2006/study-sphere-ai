@@ -4,7 +4,7 @@ const cors = require("cors");
 const multer = require("multer");
 const fs = require("fs");
 const PDFParser = require("pdf2json");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const Groq = require("groq-sdk");
 
 const app = express();
 app.use(cors());
@@ -15,8 +15,19 @@ app.get("/", (req, res) => {
 
 if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const upload = multer({ dest: "uploads/" });
+
+const MODEL = "llama-3.3-70b-versatile";
+
+async function askGroq(prompt) {
+  const result = await groq.chat.completions.create({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 2048,
+  });
+  return result.choices[0].message.content;
+}
 
 /* ── UPLOAD ── */
 app.post("/upload", upload.single("file"), async (req, res) => {
@@ -74,9 +85,8 @@ Main Topic: [The Central Concept]
 Keep branches short (3-5 words max).
 Document: ${context.substring(0, 15000)}`;
     }
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent(prompt);
-    res.json({ answer: result.response.text() });
+    const answer = await askGroq(prompt);
+    res.json({ answer });
   } catch (error) {
     console.error("AI Error:", error);
     res.status(500).json({ error: "AI failed" });
@@ -95,13 +105,12 @@ app.post("/explain", async (req, res) => {
       "a college student — proper academic terminology and reasonable depth.",
       "a PhD researcher — full technical language, academic depth, assume expert knowledge."
     ];
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent(
+    const answer = await askGroq(
       `Explain the key concepts of this document to ${levels[level] || levels[2]}.
 Be engaging, thorough, and well-structured. Use paragraphs.
 Document: ${context.substring(0, 15000)}`
     );
-    res.json({ answer: result.response.text() });
+    res.json({ answer });
   } catch (error) {
     console.error("Explain Error:", error);
     res.status(500).json({ error: "Explain failed" });
@@ -113,7 +122,6 @@ app.post("/chat", async (req, res) => {
   try {
     const { message, context, history = [] } = req.body;
     if (!context) return res.status(400).json({ error: "Context missing" });
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const historyText = history.slice(-6).map(m => `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.text}`).join('\n');
     const prompt = `You are an AI Study Tutor helping a student understand a document.
 Document:
@@ -125,8 +133,8 @@ Answer clearly and concisely based ONLY on the document. If not in the document,
 
 Student: ${message}
 Tutor:`;
-    const result = await model.generateContent(prompt);
-    res.json({ answer: result.response.text() });
+    const answer = await askGroq(prompt);
+    res.json({ answer });
   } catch (error) {
     console.error("Chat Error:", error);
     res.status(500).json({ error: "Chat failed" });
