@@ -4,7 +4,7 @@ import { ReactFlow, Background, Controls, Handle, Position, useReactFlow, ReactF
 import { jsPDF } from "jspdf";
 import '@xyflow/react/dist/style.css';
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL || "https://study-sphere-backend.onrender.com";
 const springValues = { damping: 30, stiffness: 100, mass: 2 };
 
 class Grad { constructor(x,y,z){this.x=x;this.y=y;this.z=z;}dot2(x,y){return this.x*x+this.y*y;}}
