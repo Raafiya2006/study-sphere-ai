@@ -20,7 +20,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const upload = multer({ dest: "uploads/" });
 
-// 1. Upload Route
+/* ======================
+   1. PDF UPLOAD & PARSE
+====================== */
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const filePath = "./uploads/" + req.file.filename;
@@ -33,6 +35,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
           text += decodeURIComponent(t.R[0].T) + " ";
         });
       });
+      // Delete temp file after reading
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       res.json({ text });
     });
@@ -48,7 +51,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// 2. AI Feature Route
+/* ======================
+   2. CORE AI FEATURES
+====================== */
 app.post("/ask-ai", async (req, res) => {
   try {
     const { type, context } = req.body;
@@ -56,13 +61,21 @@ app.post("/ask-ai", async (req, res) => {
 
     let prompt = "";
     if (type === "flashcards") {
-      prompt = `Create 6 study flashcards from this makeup document. 
+      prompt = `Create 6 study flashcards from this document. 
       Use exactly this format: Front: [Term] | Back: [Definition] 
-      Separate each card with a newline. Do not add any other text.
+      Separate each card with a newline. Do not add markdown like asterisks.
       Document: ${context.substring(0, 15000)}`;
     } 
     else if (type === "summary") {
-      prompt = `Create a summary of this document. Include Title, Overview, and Key Points.\n\nDocument: ${context.substring(0, 15000)}`;
+      prompt = `Create a professional, detailed study summary of this document. 
+      Format it as follows:
+      1. A strong Title.
+      2. A 3-4 sentence Overview paragraph.
+      3. Key Points section with detailed descriptions.
+      4. A Conclusion paragraph.
+      
+      Do not use any asterisks (**) or special markdown characters.
+      Document: ${context.substring(0, 15000)}`;
     } 
     else if (type === "quiz") {
       prompt = `Generate 10 multiple choice questions based on this document.
@@ -75,38 +88,61 @@ app.post("/ask-ai", async (req, res) => {
       Correct: [Letter]
       Reason: [One sentence explanation why]
 
-      Focus on key makeup products and market gaps.
       Document: ${context.substring(0, 15000)}`;
     } 
     else if (type === "mindmap") {
       prompt = `
-Create a hierarchical mind map of this makeup document. 
-
-Use this EXACT format:
-Main Topic: [The Central Concept]
-  ├ [Sub-topic 1]
-    ├ [Detail A]
-    └ [Detail B]
-  ├ [Sub-topic 2]
-  └ [Final Sub-topic]
-
-Focus on: Product Categories, Features, and Market Gaps.
-Keep branches short (3-5 words max).
-
-Document:
-${context.substring(0, 15000)}
-`;
+      Create a hierarchical mind map of this document. 
+      Use this EXACT format:
+      Main Topic: [The Central Concept]
+        ├ [Sub-topic 1]
+          ├ [Detail A]
+          └ [Detail B]
+        ├ [Sub-topic 2]
+        └ [Final Sub-topic]
+      Focus on: Categories, Features, and Key Concepts.
+      Keep branches short (3-5 words max).
+      Document: ${context.substring(0, 15000)}`;
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
     const result = await model.generateContent(prompt);
-    const answer = result.response.text();
-
-    res.json({ answer });
+    res.json({ answer: result.response.text() });
   } catch (error) {
     console.error("AI Route Error:", error);
     res.status(500).json({ error: "AI failed to generate content" });
   }
 });
 
-app.listen(5000, () => console.log("🚀 Server running on port 5000 with gemini-3-flash-preview"));
+/* ======================
+   3. INTELLIGENT RETRIEVAL (CHAT)
+====================== */
+app.post("/chat", async (req, res) => {
+  try {
+    const { message, context } = req.body;
+    if (!context) return res.status(400).json({ error: "Context missing" });
+
+    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+
+    const prompt = `
+      You are an AI Study Tutor. You are helping a student understand a document.
+      Here is the document content for your reference:
+      ---
+      ${context.substring(0, 15000)}
+      ---
+      Answer the user's question clearly and concisely based ONLY on the text above. 
+      If the information isn't in the document, politely say you don't know based on the provided material.
+      
+      User Question: ${message}
+    `;
+
+    const result = await model.generateContent(prompt);
+    res.json({ answer: result.response.text() });
+  } catch (error) {
+    console.error("Chat Error:", error);
+    res.status(500).json({ error: "Chat processing failed" });
+  }
+});
+
+const PORT = 5000;
+app.listen(PORT, () => console.log(`🚀 StudySphere Server running on port ${PORT}`));
