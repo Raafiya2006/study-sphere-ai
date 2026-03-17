@@ -10,139 +10,125 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Create uploads folder if it doesn't exist
-if (!fs.existsSync("./uploads")) {
-    fs.mkdirSync("./uploads");
-}
+if (!fs.existsSync("./uploads")) fs.mkdirSync("./uploads");
 
-// Initialize AI with your .env key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 const upload = multer({ dest: "uploads/" });
 
-/* ======================
-   1. PDF UPLOAD & PARSE
-====================== */
+/* ── UPLOAD ── */
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const filePath = "./uploads/" + req.file.filename;
     const pdfParser = new PDFParser();
-
     pdfParser.on("pdfParser_dataReady", pdfData => {
       let text = "";
-      pdfData.Pages.forEach(page => {
-        page.Texts.forEach(t => {
-          text += decodeURIComponent(t.R[0].T) + " ";
-        });
-      });
-      // Delete temp file after reading
+      pdfData.Pages.forEach(page => { page.Texts.forEach(t => { text += decodeURIComponent(t.R[0].T) + " "; }); });
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       res.json({ text });
     });
-
-    pdfParser.on("pdfParser_dataError", err => {
-      console.error(err);
-      res.status(500).json({ error: "PDF Extraction Error" });
-    });
-
+    pdfParser.on("pdfParser_dataError", err => { console.error(err); res.status(500).json({ error: "PDF Error" }); });
     pdfParser.loadPDF(filePath);
-  } catch (error) {
-    res.status(500).json({ error: "Upload failed" });
-  }
+  } catch (error) { res.status(500).json({ error: "Upload failed" }); }
 });
 
-/* ======================
-   2. CORE AI FEATURES
-====================== */
+/* ── AI FEATURES ── */
 app.post("/ask-ai", async (req, res) => {
   try {
     const { type, context } = req.body;
-    if (!context) return res.status(400).json({ error: "No document text found" });
-
+    if (!context) return res.status(400).json({ error: "No document text" });
     let prompt = "";
     if (type === "flashcards") {
       prompt = `Create 6 study flashcards from this document. 
-      Use exactly this format: Front: [Term] | Back: [Definition] 
-      Separate each card with a newline. Do not add markdown like asterisks.
-      Document: ${context.substring(0, 15000)}`;
-    } 
-    else if (type === "summary") {
-      prompt = `Create a professional, detailed study summary of this document. 
-      Format it as follows:
-      1. A strong Title.
-      2. A 3-4 sentence Overview paragraph.
-      3. Key Points section with detailed descriptions.
-      4. A Conclusion paragraph.
-      
-      Do not use any asterisks (**) or special markdown characters.
-      Document: ${context.substring(0, 15000)}`;
-    } 
-    else if (type === "quiz") {
+Use exactly this format: Front: [Term] | Back: [Definition] 
+Separate each card with a newline. No asterisks or markdown.
+Document: ${context.substring(0, 15000)}`;
+    } else if (type === "summary") {
+      prompt = `Create a professional detailed study summary of this document.
+Format: 1. Strong Title. 2. 3-4 sentence Overview. 3. Key Points with descriptions. 4. Conclusion.
+No asterisks or markdown characters.
+Document: ${context.substring(0, 15000)}`;
+    } else if (type === "quiz") {
       prompt = `Generate 10 multiple choice questions based on this document.
-      Use this EXACT format for each:
-      Q: [Question]
-      A) [Option]
-      B) [Option]
-      C) [Option]
-      D) [Option]
-      Correct: [Letter]
-      Reason: [One sentence explanation why]
+Use this EXACT format for each:
+Q: [Question]
+A) [Option]
+B) [Option]
+C) [Option]
+D) [Option]
+Correct: [Letter]
+Reason: [One sentence explanation]
 
-      Document: ${context.substring(0, 15000)}`;
-    } 
-    else if (type === "mindmap") {
-      prompt = `
-      Create a hierarchical mind map of this document. 
-      Use this EXACT format:
-      Main Topic: [The Central Concept]
-        ├ [Sub-topic 1]
-          ├ [Detail A]
-          └ [Detail B]
-        ├ [Sub-topic 2]
-        └ [Final Sub-topic]
-      Focus on: Categories, Features, and Key Concepts.
-      Keep branches short (3-5 words max).
-      Document: ${context.substring(0, 15000)}`;
+Document: ${context.substring(0, 15000)}`;
+    } else if (type === "mindmap") {
+      prompt = `Create a hierarchical mind map of this document.
+Use this EXACT format:
+Main Topic: [The Central Concept]
+  ├ [Sub-topic 1]
+    ├ [Detail A]
+    └ [Detail B]
+  ├ [Sub-topic 2]
+  └ [Final Sub-topic]
+Keep branches short (3-5 words max).
+Document: ${context.substring(0, 15000)}`;
     }
-
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(prompt);
     res.json({ answer: result.response.text() });
   } catch (error) {
-    console.error("AI Route Error:", error);
-    res.status(500).json({ error: "AI failed to generate content" });
+    console.error("AI Error:", error);
+    res.status(500).json({ error: "AI failed" });
   }
 });
 
-/* ======================
-   3. INTELLIGENT RETRIEVAL (CHAT)
-====================== */
+/* ── ELI5 EXPLAIN ── */
+app.post("/explain", async (req, res) => {
+  try {
+    const { context, level } = req.body;
+    if (!context) return res.status(400).json({ error: "No document text" });
+    const levels = [
+      "a 5 year old — use very simple words, fun comparisons, and short sentences. Make it playful.",
+      "a 10 year old — use simple language, relatable examples, avoid heavy jargon.",
+      "a high school student — clear language with some technical terms explained simply.",
+      "a college student — proper academic terminology and reasonable depth.",
+      "a PhD researcher — full technical language, academic depth, assume expert knowledge."
+    ];
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(
+      `Explain the key concepts of this document to ${levels[level] || levels[2]}.
+Be engaging, thorough, and well-structured. Use paragraphs.
+Document: ${context.substring(0, 15000)}`
+    );
+    res.json({ answer: result.response.text() });
+  } catch (error) {
+    console.error("Explain Error:", error);
+    res.status(500).json({ error: "Explain failed" });
+  }
+});
+
+/* ── CHAT ── */
 app.post("/chat", async (req, res) => {
   try {
-    const { message, context } = req.body;
+    const { message, context, history = [] } = req.body;
     if (!context) return res.status(400).json({ error: "Context missing" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const historyText = history.slice(-6).map(m => `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.text}`).join('\n');
+    const prompt = `You are an AI Study Tutor helping a student understand a document.
+Document:
+---
+${context.substring(0, 15000)}
+---
+${historyText ? `Previous conversation:\n${historyText}\n` : ''}
+Answer clearly and concisely based ONLY on the document. If not in the document, say so politely.
 
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
-
-    const prompt = `
-      You are an AI Study Tutor. You are helping a student understand a document.
-      Here is the document content for your reference:
-      ---
-      ${context.substring(0, 15000)}
-      ---
-      Answer the user's question clearly and concisely based ONLY on the text above. 
-      If the information isn't in the document, politely say you don't know based on the provided material.
-      
-      User Question: ${message}
-    `;
-
+Student: ${message}
+Tutor:`;
     const result = await model.generateContent(prompt);
     res.json({ answer: result.response.text() });
   } catch (error) {
     console.error("Chat Error:", error);
-    res.status(500).json({ error: "Chat processing failed" });
+    res.status(500).json({ error: "Chat failed" });
   }
 });
 
-const PORT = 5000;
-app.listen(PORT, () => console.log(`🚀 StudySphere Server running on port ${PORT}`));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`StudySphere running on port ${PORT}`));
