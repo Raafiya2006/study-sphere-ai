@@ -3,6 +3,9 @@ import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motio
 import { ReactFlow, Background, Controls, Handle, Position, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import { jsPDF } from "jspdf";
 import '@xyflow/react/dist/style.css';
+import { auth } from "./firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import Auth from "./Auth";
 
 const API = "https://study-sphere-backend-r6u5.onrender.com";
 const springValues = { damping: 30, stiffness: 100, mass: 2 };
@@ -128,7 +131,7 @@ function QuizView({ data }) {
   const [currentQ,setCurrentQ]=useState(0);const [selected,setSelected]=useState(null);
   const [isAnswered,setIsAnswered]=useState(false);const [score,setScore]=useState(0);
   const [isComplete,setIsComplete]=useState(false);const [mistakes,setMistakes]=useState([]);
-  const questions = useMemo(()=>data.split(/Q:/).filter(q=>q.trim()).map(qBlock=>{
+  const questions = useMemo(()=>data.split(/Q:/).filter(q=>q.trim() && q.includes('Correct:')).map(qBlock=>{
     const lines=qBlock.split('\n').filter(l=>l.trim());
     return{question:lines[0].replace(/\*\*/g,"").trim(),options:lines.slice(1,5).map(opt=>opt.replace(/\*\*/g,"").trim()),correct:lines.find(l=>l.includes("Correct:"))?.split(":")[1]?.trim(),reason:lines.find(l=>l.includes("Reason:"))?.split(":")[1]?.trim()};
   }),[data]);
@@ -223,11 +226,20 @@ function StudyCard({front,back,index,total}){
 
 /* ── MAIN APP ── */
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const[file,setFile]=useState(null);const[pdfText,setPdfText]=useState("");
   const[result,setResult]=useState("");const[currentType,setCurrentType]=useState("");
   const[loading,setLoading]=useState(false);const[chatOpen,setChatOpen]=useState(false);
   const[chatInput,setChatInput]=useState("");const[chatHistory,setChatHistory]=useState([]);
   const[chatLoading,setChatLoading]=useState(false);const chatEndRef=useRef(null);
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+  }, []);
 
   const auraColors={
     idle:'rgba(59,130,246,0.4)',summary:'rgba(168,85,247,0.4)',quiz:'rgba(239,68,68,0.4)',
@@ -263,10 +275,17 @@ export default function App() {
 
   const buttons=[{key:"summary",label:"📋 Summary"},{key:"quiz",label:"🧪 Quiz"},{key:"flashcards",label:"🃏 Flashcards"},{key:"mindmap",label:"🗺️ Mind Map"},{key:"explain",label:"🧠 ELI5"}];
 
+  if (authLoading) return <div style={{minHeight:'100vh',background:'#070b14'}}/>;
+  if (!user) return <Auth onLogin={()=>{}} />;
+
   return(
     <div style={{textAlign:"center",padding:"40px",minHeight:"100vh",color:'#fff',fontFamily:'Inter,sans-serif'}}>
       <RestoredWaves lineColor={auraColors[currentType]||auraColors.idle}/>
       <div style={{position:'relative',zIndex:1}}>
+        <div style={{position:'absolute',top:0,right:0,display:'flex',alignItems:'center',gap:'12px'}}>
+          <span style={{color:'#94a3b8',fontSize:'0.85rem'}}>👋 {user.email}</span>
+          <button onClick={()=>signOut(auth)} style={{background:'rgba(239,68,68,0.2)',color:'#f87171',border:'1px solid rgba(239,68,68,0.3)',padding:'8px 16px',borderRadius:'8px',cursor:'pointer',fontSize:'0.85rem'}}>Sign Out</button>
+        </div>
         <motion.h1 initial={{opacity:0,y:-20}} animate={{opacity:1,y:0}}
           style={{background:'linear-gradient(to right,#60a5fa,#a855f7)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',fontSize:'3.5rem',fontWeight:'900',marginBottom:'8px'}}>
           StudySphere AI
